@@ -104,6 +104,55 @@ public partial class MainForm : Form
 			// that don't require a restart
 		}
 	}
+
+    private enum CopyDataCmd
+    {
+        LaunchAccount = 0x4d1, // lpData = utf-16 character name to launch
+    }
+
+    // Quick addon for an rpc based method of launching an account
+    [StructLayout(LayoutKind.Sequential)]
+    private struct COPYDATASTRUCT
+    {
+        public IntPtr dwData;   // an app-defined id you can switch on
+        public int cbData;   // size of lpData in bytes
+        public IntPtr lpData;   // pointer to the data
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg != 0x004A /* WM_COPYDATA */)
+        {
+            base.WndProc(ref m);
+            return;
+        }
+
+        var cds = Marshal.PtrToStructure<COPYDATASTRUCT>(m.LParam);
+
+        CopyDataCmd cmd = (CopyDataCmd)cds.dwData;
+        switch (cmd)
+        {
+            case CopyDataCmd.LaunchAccount:{
+                    string acctname = Marshal.PtrToStringUni(cds.lpData, cds.cbData / 2);
+                    for (var i = 0; i < Program.Accounts.Length; i++)
+                    {
+                        if (acctname ==  Program.Accounts[i].Name)
+                        {
+                            Program.QueueLaunch(i);
+                            break;
+                        }
+                    }
+                    break;
+            }
+
+
+            default:
+                base.WndProc(ref m);
+                break;
+        }
+    }
+
+
 	public static void OnAccountSaved(Account account)
     {
         Program.Mutex.WaitOne();
